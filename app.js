@@ -10,7 +10,7 @@ import {
   onSnapshot, query, orderBy, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  $, BOX_ICON, CLAIM_STATUS, DAY, OPEN_STATUSES, PIN_ICON, SETTINGS, STATUS, WA_ICON, allowed, app, auth, authMessage, closeAuth, compressImage, daysSince, db, emailAllowed, esc, firebaseConfig, formatDate, friendlyError, googleSignIn, isDataImage, isLongUnclaimed, itemLink, millis, needsVerification, optionList, revealScan, setAuthMode, setupBanner, signIn, sixDigitCode, thumb, tinyPreview, toast, waSecurityLink, waShareLink, withTimeout
+  $, BOX_ICON, CLAIM_STATUS, DAY, OPEN_STATUSES, PIN_ICON, SETTINGS, STATUS, WA_ICON, allowed, app, auth, authMessage, closeAuth, compressImage, daysSince, db, emailAllowed, esc, firebaseConfig, formatDate, friendlyError, googleSignIn, isDataImage, isLongUnclaimed, itemLink, millis, needsVerification, optionList, revealScan, setAuthMode, setupBanner, signIn, sixDigitCode, thumb, tinyPreview, toast, waSecurityLink, waShareLink, withTimeout, trackSave
 } from "./core.js";
 
 // Catch the "replaced some files but not index.html" mistake
@@ -264,12 +264,12 @@ $("profileForm").addEventListener("submit", async (e) => {
   // Save in the background: Firebase keeps the change on this device straight away and
   // finishes sending it to the server on its own, so the student doesn't have to wait.
   // (merge: creates the profile if it was never made, otherwise just updates these fields)
-  setDoc(doc(db, "users", uid), {
+  trackSave(setDoc(doc(db, "users", uid), {
     uid,
     email: state.profile?.email ?? state.user.email ?? "",
     ...fields,
     updatedAt: serverTimestamp(),
-  }, { merge: true }).catch((err) => {
+  }, { merge: true }), (err) => {
     // Only reached if the server refuses the save (e.g. rules not published)
     toast("Your profile couldn't be saved. " + friendlyError(err));
     if (state.user?.uid === uid) { location.hash = "profile"; showPage(); }
@@ -611,29 +611,31 @@ async function submitClaim(item) {
     return;
   }
   msg.textContent = "Submitting…";
-  try {
-    const file = $("cPhoto").files[0];
-    const proofPhoto = file ? await compressImage(file, 800) : null;
-    await withTimeout(addDoc(collection(db, "claims"), {
-      itemId: item.id,
-      itemTitle: item.title,
-      claimantUid: state.user.uid,
-      name: v("cName"),
-      studentId: v("cSid"),
-      contact: v("cContact"),
-      proof: v("cProof"),
-      proofPhoto,
-      status: "pending",
-      createdAt: serverTimestamp(),
-    }));
-    if (item.status === "available") {
-      await updateDoc(doc(db, "items", item.id), { status: "pending" });
-    }
-    toast("Proof submitted! You'll see the result under My stuff.");
-    closeModal();
-  } catch (err) {
-    msg.textContent = friendlyError(err);
+  let proofPhoto = null;
+  const file = $("cPhoto").files[0];
+  if (file) {
+    try { proofPhoto = await compressImage(file, 800); }
+    catch { msg.textContent = "That photo couldn't be read. Try a JPG or PNG, or leave it out."; return; }
   }
+  const failed = (err) => toast("Your claim couldn't be sent. " + friendlyError(err));
+  // Saved on this device straight away; Firebase sends it in the background
+  trackSave(setDoc(doc(collection(db, "claims")), {
+    itemId: item.id,
+    itemTitle: item.title,
+    claimantUid: state.user.uid,
+    name: v("cName"),
+    studentId: v("cSid"),
+    contact: v("cContact"),
+    proof: v("cProof"),
+    proofPhoto,
+    status: "pending",
+    createdAt: serverTimestamp(),
+  }), failed);
+  if (item.status === "available") {
+    trackSave(updateDoc(doc(db, "items", item.id), { status: "pending" }));
+  }
+  toast("Proof submitted! You'll see the result under My stuff.");
+  closeModal();
 }
 
 // ---------- Sign-in gates ----------
@@ -682,49 +684,42 @@ $("foundForm").addEventListener("submit", async (e) => {
   }
   if (!state.user) { msg.textContent = "Please sign in first."; return; }
 
-  const btn = $("foundSubmit");
-  btn.disabled = true;
-  msg.textContent = "Saving…";
-  try {
-    const hide = $("hidePhoto").checked && !!state.photo;
-    const ref = doc(collection(db, "items"));
-    const item = {
-      title: v("title"),
-      category: v("category"),
-      location: location_,
-      foundDate: v("foundDate"),
-      keptAt: v("keptAt"),
-      description: v("description"),
-      photo: hide ? await tinyPreview(state.photo) : state.photo,
-      photoHidden: hide,
-      status: "available",
-      postedBy: state.user.uid,
-      createdAt: serverTimestamp(),
-    };
-    if (hide) {
-      await withTimeout(setDoc(doc(db, "privatePhotos", ref.id), { photo: state.photo, postedBy: state.user.uid, allowed: [] }));
-    }
-    await withTimeout(setDoc(ref, item));
-
-    // "Saved!" screen
-    state.lastUploaded = { id: ref.id, ...item };
-    $("successItem").innerHTML = `${thumb(item)}<div><strong>${esc(item.title)}</strong><span>${esc(item.location)} · kept at ${esc(item.keptAt)}</span></div>`;
-    $("shareUploaded").href = waShareLink(state.lastUploaded);
-    $("foundForm").reset();
-    $("foundDate").value = today();
-    $("locationOther").classList.add("hidden");
-    state.photo = null;
-    $("photoPreview").classList.add("hidden");
-    $("photoEmpty").classList.remove("hidden");
-    msg.textContent = "";
-    $("foundSuccess").classList.remove("hidden");
-    renderGates();
-    window.scrollTo(0, 0);
-  } catch (err) {
-    msg.textContent = friendlyError(err);
-  } finally {
-    btn.disabled = false;
+  const hide = $("hidePhoto").checked && !!state.photo;
+  const ref = doc(collection(db, "items"));
+  const item = {
+    title: v("title"),
+    category: v("category"),
+    location: location_,
+    foundDate: v("foundDate"),
+    keptAt: v("keptAt"),
+    description: v("description"),
+    photo: hide ? await tinyPreview(state.photo) : state.photo,
+    photoHidden: hide,
+    status: "available",
+    postedBy: state.user.uid,
+    createdAt: serverTimestamp(),
+  };
+  // Saved on this device straight away; Firebase uploads it in the background
+  const failed = (err) => toast(`"${item.title}" couldn't be uploaded. ${friendlyError(err)}`);
+  if (hide) {
+    trackSave(setDoc(doc(db, "privatePhotos", ref.id), { photo: state.photo, postedBy: state.user.uid, allowed: [] }), failed);
   }
+  trackSave(setDoc(ref, item), failed);
+
+  // "Saved!" screen
+  state.lastUploaded = { id: ref.id, ...item };
+  $("successItem").innerHTML = `${thumb(item)}<div><strong>${esc(item.title)}</strong><span>${esc(item.location)} · kept at ${esc(item.keptAt)}</span></div>`;
+  $("shareUploaded").href = waShareLink(state.lastUploaded);
+  $("foundForm").reset();
+  $("foundDate").value = today();
+  $("locationOther").classList.add("hidden");
+  state.photo = null;
+  $("photoPreview").classList.add("hidden");
+  $("photoEmpty").classList.remove("hidden");
+  msg.textContent = "";
+  $("foundSuccess").classList.remove("hidden");
+  renderGates();
+  window.scrollTo(0, 0);
 });
 $("uploadAnother").addEventListener("click", () => { $("foundSuccess").classList.add("hidden"); renderGates(); window.scrollTo(0, 0); });
 $("viewUploaded").addEventListener("click", () => {
@@ -740,31 +735,23 @@ $("lostForm").addEventListener("submit", async (e) => {
   const msg = $("lostMsg");
   if (!v("lTitle") || !v("lCategory") || !v("lDate")) { msg.textContent = "Please fill in the fields marked *."; return; }
   if (!state.user) { msg.textContent = "Please sign in first."; return; }
-  const btn = $("lostSubmit");
-  btn.disabled = true;
-  msg.textContent = "Saving…";
-  try {
-    await withTimeout(addDoc(collection(db, "lostReports"), {
-      uid: state.user.uid,
-      title: v("lTitle"),
-      category: v("lCategory"),
-      lostDate: v("lDate"),
-      location: readLocation("lLocation", "lLocationOther"),
-      description: v("lDescription"),
-      status: "open",
-      createdAt: serverTimestamp(),
-    }));
-    $("lostForm").reset();
-    $("lDate").value = today();
-    $("lLocationOther").classList.add("hidden");
-    msg.textContent = "";
-    toast("Saved! We'll flag it under My stuff when a matching item is uploaded.");
-    location.hash = "mine";
-  } catch (err) {
-    msg.textContent = friendlyError(err);
-  } finally {
-    btn.disabled = false;
-  }
+  // Saved on this device straight away; Firebase sends it in the background
+  trackSave(setDoc(doc(collection(db, "lostReports")), {
+    uid: state.user.uid,
+    title: v("lTitle"),
+    category: v("lCategory"),
+    lostDate: v("lDate"),
+    location: readLocation("lLocation", "lLocationOther"),
+    description: v("lDescription"),
+    status: "open",
+    createdAt: serverTimestamp(),
+  }), (err) => toast("Your lost report couldn't be saved. " + friendlyError(err)));
+  $("lostForm").reset();
+  $("lDate").value = today();
+  $("lLocationOther").classList.add("hidden");
+  msg.textContent = "";
+  toast("Saved! We'll flag it under My stuff when a matching item is uploaded.");
+  location.hash = "mine";
 });
 
 // ---------- My stuff ----------
