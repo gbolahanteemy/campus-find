@@ -194,7 +194,8 @@ onAuthStateChanged(auth, async (user) => {
     // Once the profile has loaded, send new students to "Complete your profile" if needed
     loadProfile(user).then(() => {
       if (state.user?.uid !== uid) return;
-      if (!profileComplete(state.profile)) showPage(); else render();
+      if (!profileComplete(state.profile)) showPage();
+      else { if (state.currentPage === "profile") fillProfileForm(); render(); }
     });
   }
 });
