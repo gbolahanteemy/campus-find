@@ -592,3 +592,17 @@ button, input, textarea, select { font: inherit; color: inherit; }
   .admin-page .admin-head-right { gap: 8px; }
 }
 .toast { width: max-content; text-align: center; }
+
+/* ---------- "Sending…" label for background saves ---------- */
+.sync-pill {
+  position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 150;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow);
+  padding: 10px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+}
+.sync-pill .spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--tint-2); border-top-color: var(--accent);
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
