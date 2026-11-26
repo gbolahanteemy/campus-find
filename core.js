@@ -379,8 +379,71 @@ window.addEventListener("beforeunload", (e) => {
 export function trackSave(promise, onError) {
   pendingSaves++;
   updateSyncPill();
+  let done = false;
+  // Still not confirmed after 12 seconds? Find out why and tell the person.
+  const slowTimer = setTimeout(() => { if (!done) explainSlowSave(); }, 12000);
   promise
     .catch((err) => { console.error(err); if (onError) onError(err); })
-    .finally(() => { pendingSaves--; updateSyncPill(); });
+    .finally(() => { done = true; clearTimeout(slowTimer); pendingSaves--; updateSyncPill(); });
   return promise;
+}
+
+// ---------- Connection check: can this website talk to the Firebase database? ----------
+// Asks Google's database server directly and turns its answer into a plain-English fix.
+export async function checkServer() {
+  const host = location.hostname;
+  // Ask as the signed-in person when possible: that gives the clearest answer
+  const user = auth.currentUser;
+  const path = user ? `users/${encodeURIComponent(user.uid)}` : "connectionCheck/ping";
+  const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseConfig.projectId)}/databases/(default)/documents/${path}?key=${encodeURIComponent(firebaseConfig.apiKey)}`;
+  let res, body = {};
+  try {
+    const headers = {};
+    if (user) { try { headers.Authorization = "Bearer " + (await user.getIdToken()); } catch {} }
+    res = await fetch(url, { cache: "no-store", headers });
+    body = await res.json().catch(() => ({}));
+  } catch {
+    return { ok: false, text: "This device can't reach Google's database server. The network may be blocking it. Try a different Wi-Fi or mobile data, and turn off any VPN or ad-blocker." };
+  }
+  const err = body.error || {};
+  const detail = `${err.message || ""} ${err.status || ""} ${JSON.stringify(err.details || "")}`;
+  if (res.ok) return { ok: true };
+  if (/REFERRER|referer/i.test(detail)) {
+    return { ok: false, text: `Your Firebase API key is blocking this website. In Google Cloud → APIs & Services → Credentials → Browser key → Website restrictions, add ${location.protocol}//${host}/* and Save (it takes ~5 minutes).` };
+  }
+  if (/API_KEY_INVALID|API key not valid/i.test(detail)) {
+    return { ok: false, text: "The apiKey in firebase-config.js is wrong. Copy it again from Firebase → Project settings → Your apps → Config." };
+  }
+  if (/SERVICE_DISABLED|has not been used|is disabled/i.test(detail)) {
+    return { ok: false, text: "The Cloud Firestore API is turned off for this project. Open Firebase → Firestore Database once, or enable \"Cloud Firestore API\" in Google Cloud." };
+  }
+  if (res.status === 404 && /does not exist for project|database \(default\) does not exist/i.test(detail)) {
+    return { ok: false, text: "The Firestore database hasn't been created. Go to Firebase → Build → Firestore Database → Create database (keep the ID as \"(default)\"), then publish your rules." };
+  }
+  if (/API_KEY_SERVICE_BLOCKED|are blocked/i.test(detail) || (user && /ACCESS_DENIED|Permission denied on the service/i.test(detail))) {
+    return { ok: false, text: `Google is refusing your API key access to the database. In Google Cloud → APIs & Services → Credentials → Browser key: set "API restrictions" to "Don't restrict key" (or tick Cloud Firestore API), check that ${location.protocol}//${host}/* is under Website restrictions, then Save and wait ~5 minutes. Also make sure "Cloud Firestore API" is enabled.` };
+  }
+  if (user && res.status === 403 && /insufficient permissions/i.test(detail)) {
+    return { ok: false, text: "The database is refusing your account. Publish the latest firestore.rules in Firebase → Firestore Database → Rules." };
+  }
+  // The normal, healthy answer: the server was reached and your security rules replied
+  if (res.status === 403 && /insufficient permissions/i.test(detail)) return { ok: true };
+  if (res.status === 404) return { ok: true };
+  return { ok: false, text: `The database server answered with an error (${res.status}): ${err.message || "unknown"}` };
+}
+
+let slowExplained = false;
+async function explainSlowSave() {
+  if (slowExplained) return;
+  slowExplained = true;
+  const pillText = document.querySelector("#syncPill span:last-child");
+  if (pillText) pillText.textContent = "Still sending… checking your connection";
+  const result = await checkServer();
+  if (result.ok) {
+    if (pillText) pillText.textContent = "Slow connection… still sending, keep this page open";
+  } else {
+    if (pillText) pillText.textContent = "Can't reach the server (see the message at the top)";
+    setupBanner(result.text);
+    toast(result.text);
+  }
 }
