@@ -354,3 +354,33 @@ if (installBtn && !isInstalled()) {
     toast("Installed! You'll find CampusFound on your home screen.");
   });
 }
+
+
+// ---------- Background saving ----------
+// Firebase keeps a change on this device immediately and sends it to the server by itself.
+// trackSave() shows a small "Sending…" label until the server has it, and warns before
+// the page is closed so nothing is lost on a slow connection.
+let pendingSaves = 0;
+function updateSyncPill() {
+  let pill = document.getElementById("syncPill");
+  if (!pill) {
+    pill = document.createElement("div");
+    pill.id = "syncPill";
+    pill.className = "sync-pill hidden";
+    pill.setAttribute("role", "status");
+    pill.innerHTML = '<span class="spinner" aria-hidden="true"></span><span>Sending… keep this page open</span>';
+    document.body.appendChild(pill);
+  }
+  pill.classList.toggle("hidden", pendingSaves === 0);
+}
+window.addEventListener("beforeunload", (e) => {
+  if (pendingSaves > 0) { e.preventDefault(); e.returnValue = ""; }
+});
+export function trackSave(promise, onError) {
+  pendingSaves++;
+  updateSyncPill();
+  promise
+    .catch((err) => { console.error(err); if (onError) onError(err); })
+    .finally(() => { pendingSaves--; updateSyncPill(); });
+  return promise;
+}
