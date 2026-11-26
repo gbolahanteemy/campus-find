@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Campus Lost & Found</title>
+  <meta name="theme-color" content="#0b2a5b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="CampusFound">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/favicon-48.png" sizes="48x48" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== Header ===== -->
+  <header class="header">
+    <div class="container header-inner">
+      <a href="#home" class="logo">
+        <span class="logo-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+        </span>
+        <span>Campus<b>Found</b></span>
+      </a>
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+        <i class="dot hidden" data-match-dot></i>
+      </button>
+
+      <nav class="nav" id="nav">
+        <a href="#home" data-link="home">Home</a>
+        <a href="#lost" data-link="lost">Found items</a>
+        <a href="#found" data-link="found">Report found</a>
+        <a href="#report-lost" data-link="report-lost">Report lost</a>
+        <a href="#mine" data-link="mine" class="signed-in-only hidden">My stuff <i class="dot hidden" data-match-dot></i></a>
+        <button class="btn btn-outline btn-sm install-btn hidden" id="installBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+          Install app
+        </button>
+        <div class="auth" id="auth">
+          <button class="btn btn-dark btn-sm" id="signInBtn">Sign in</button>
+          <div class="user hidden" id="userBox">
+            <img id="userPhoto" alt="" referrerpolicy="no-referrer">
+            <a href="#profile" id="userName" class="user-link" title="My profile"></a>
+            <button class="btn btn-outline btn-sm" id="signOutBtn">Sign out</button>
+          </div>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- ===== Home ===== -->
+    <section class="page" id="page-home">
+      <div class="hero">
+        <div class="container">
+          <a href="#mine" class="match-banner hidden" id="matchBanner"></a>
+        </div>
+        <div class="container hero-grid">
+          <div class="reveal">
+            <span class="eyebrow-pill">For students, staff & campus security</span>
+            <h1>Find &amp; recover<br>your lost items<br><span class="accent">with ease.</span></h1>
+            <p class="lead">Found something on campus? Upload it in a minute. Lost something? Search the items others have handed in, and prove it's yours to get it back.</p>
+            <div class="hero-actions">
+              <a href="#lost" class="big-action lost">
+                <span>I lost something</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+              </a>
+              <a href="#found" class="big-action found">
+                <span>I found something</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              </a>
+            </div>
+            <p class="hero-note">Can't find it yet? <a href="#report-lost">Report what you lost</a> and we'll flag it when a matching item is uploaded.</p>
+          </div>
+
+          <div class="hero-visual reveal" style="--d:120ms">
+            <div class="recent-card signed-out-only hidden" id="welcomeCard">
+              <div class="gate-icon small-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+              </div>
+              <h3>Students &amp; staff only</h3>
+              <p class="muted small">Sign in with Google or your email to browse found items, report what you lost, and claim your things.</p>
+              <button class="btn btn-dark" data-signin>Sign in</button>
+            </div>
+            <div class="recent-card signed-in-only hidden" id="recentCard">
+              <div class="recent-head">
+                <span>Recently found</span>
+                <a href="#lost">See all</a>
+              </div>
+              <div id="recentList" class="recent-list"><p class="muted small">Loading…</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="container stats signed-in-only hidden">
+          <div class="reveal"><strong id="statTotal">–</strong><span>Items reported</span></div>
+          <div class="reveal" style="--d:100ms"><strong id="statWaiting">–</strong><span>Waiting for owners</span></div>
+          <div class="reveal" style="--d:200ms"><strong id="statReturned">–</strong><span>Returned to owners</span></div>
+        </div>
+      </div>
+
+      <div class="how">
+        <div class="container">
+          <div class="reveal">
+            <span class="eyebrow">How it works</span>
+            <h2>Three steps to get it back</h2>
+          </div>
+          <div class="steps">
+            <div class="step reveal" style="--d:0ms">
+              <span class="step-num">1</span>
+              <h3>Finder uploads it</h3>
+              <p>Whoever finds an item posts a photo, where it was found, and where it's being kept.</p>
+            </div>
+            <div class="step reveal" style="--d:120ms">
+              <span class="step-num">2</span>
+              <h3>Owner submits proof</h3>
+              <p>Spot your item? Describe something only the owner would know: what's inside, a scratch, the lock screen.</p>
+            </div>
+            <div class="step reveal" style="--d:240ms">
+              <span class="step-num">3</span>
+              <h3>Approved &amp; collected</h3>
+              <p>Security checks the proof and gives you a 6-digit pickup code. Show it with your student ID to collect.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Sign-in required ===== -->
+    <section class="page hidden" id="page-gate">
+      <div class="container page-pad">
+        <div class="gate-card">
+          <div class="gate-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+          </div>
+          <h1>Sign in to continue</h1>
+          <p class="muted" id="gateText">Campus Lost &amp; Found is for students and staff. Sign in to see found items, report something you lost or found, and check your claims.</p>
+          <button class="btn btn-primary" data-signin>Sign in or create an account</button>
+          <a href="#home" class="link-btn">Back to home</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Found items (browse) ===== -->
+    <section class="page hidden" id="page-lost">
+      <div class="container page-pad">
+        <div class="page-head">
+          <div>
+            <h1>Found items</h1>
+            <p class="muted">Is one of these yours? Open it and submit proof that you own it.</p>
+          </div>
+          <div class="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+            <input id="search" type="search" placeholder="Search phone, keys, library…" aria-label="Search found items">
+          </div>
+        </div>
+
+        <div class="chips" id="categoryChips"></div>
+
+        <div class="filter-row">
+          <div class="tabs" id="filterTabs">
+            <button class="tab active" data-filter="open">Waiting for owner</button>
+            <button class="tab" data-filter="returned">Returned</button>
+            <button class="tab" data-filter="all">All</button>
+          </div>
+          <select id="locationFilter" class="select" aria-label="Filter by location"></select>
+        </div>
+
+        <div class="grid" id="itemGrid"></div>
+
+        <div class="tip-card">
+          <div>
+            <strong>Not here yet?</strong>
+            <span>Report what you lost and we'll flag it for you when a matching item is uploaded.</span>
+          </div>
+          <a href="#report-lost" class="btn btn-dark btn-sm">Report lost item</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Report found: upload form ===== -->
+    <section class="page hidden" id="page-found">
+      <div class="container page-pad">
+        <div class="page-head">
+          <div>
+            <h1>Report a found item</h1>
+            <p class="muted">Thanks for helping! Add a clear photo and a few details.</p>
+          </div>
+        </div>
+
+        <div class="signin-gate hidden" id="foundGate">
+          <p>Please sign in to upload an item, so we know who handed it in.</p>
+          <button class="btn btn-dark" data-signin>Sign in</button>
+        </div>
+
+        <div class="success-card hidden" id="foundSuccess">
+          <div class="success-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+          </div>
+          <h2>Saved! Your item is now listed.</h2>
+          <div class="success-item" id="successItem"></div>
+          <p class="muted">Students can now find it under <b>Found items</b>. Please leave the item at the place you listed so the owner can collect it.</p>
+          <div class="actions center">
+            <button class="btn btn-primary" id="viewUploaded">View the item</button>
+            <a class="btn btn-outline" id="shareUploaded" target="_blank" rel="noopener">Share on WhatsApp</a>
+            <button class="btn btn-outline" id="uploadAnother">Upload another</button>
+          </div>
+        </div>
+
+        <form class="form-card" id="foundForm" novalidate>
+          <label class="photo-drop" id="photoDrop">
+            <input type="file" id="photoInput" accept="image/*" hidden>
+            <div class="photo-empty" id="photoEmpty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="3"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8 5l1.5-2h5L16 5"/></svg>
+              <strong>Add a photo</strong>
+              <span>Tap to take or choose a picture</span>
+            </div>
+            <img id="photoPreview" class="hidden" alt="Selected photo">
+          </label>
+
+          <div class="fields">
+            <div class="field">
+              <label for="title">What is it? *</label>
+              <input id="title" maxlength="80" placeholder="e.g. Black phone in a clear case" required>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="category">Category *</label>
+                <select id="category" class="select" required></select>
+              </div>
+              <div class="field">
+                <label for="foundDate">Date found *</label>
+                <input id="foundDate" type="date" required>
+              </div>
+            </div>
+            <div class="field">
+              <label for="location">Where did you find it? *</label>
+              <select id="location" class="select" required></select>
+              <input id="locationOther" class="hidden" maxlength="80" placeholder="Type the place" style="margin-top:8px">
+            </div>
+            <div class="field">
+              <label for="keptAt">Where is it now? *</label>
+              <input id="keptAt" maxlength="100" placeholder="e.g. Security post, main gate" required>
+              <small>Where the owner can collect it.</small>
+            </div>
+            <div class="field">
+              <label for="description">Short description</label>
+              <textarea id="description" maxlength="400" placeholder="Colour, brand, size…"></textarea>
+              <small>Tip: keep back one detail only the owner would know, so you can check their proof.</small>
+            </div>
+            <label class="check">
+              <input type="checkbox" id="hidePhoto">
+              <span><b>Hide the photo for privacy</b><br><small>Blurs the photo for the public until a claim is approved. Turned on automatically for ID cards, ATM cards and documents.</small></span>
+            </label>
+            <div class="form-foot">
+              <button type="submit" class="btn btn-primary" id="foundSubmit">Upload item</button>
+              <span class="form-msg" id="foundMsg"></span>
+            </div>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ===== Report lost ===== -->
+    <section class="page hidden" id="page-report-lost">
+      <div class="container page-pad narrow">
+        <h1>Report a lost item</h1>
+        <p class="muted">Tell us what you lost. When someone uploads a similar item, it'll show up under <b>My stuff</b> with a red dot, so you don't have to keep checking.</p>
+
+        <div class="signin-gate hidden" id="lostGate" style="margin-top:24px">
+          <p>Please sign in to report a lost item.</p>
+          <button class="btn btn-dark" data-signin>Sign in</button>
+        </div>
+
+        <form class="form-card single" id="lostForm" novalidate>
+          <div class="fields">
+            <div class="field">
+              <label for="lTitle">What did you lose? *</label>
+              <input id="lTitle" maxlength="80" placeholder="e.g. Blue HP laptop in a black sleeve" required>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="lCategory">Category *</label>
+                <select id="lCategory" class="select" required></select>
+              </div>
+              <div class="field">
+                <label for="lDate">When did you lose it? *</label>
+                <input id="lDate" type="date" required>
+              </div>
+            </div>
+            <div class="field">
+              <label for="lLocation">Where do you think you lost it?</label>
+              <select id="lLocation" class="select"></select>
+              <input id="lLocationOther" class="hidden" maxlength="80" placeholder="Type the place" style="margin-top:8px">
+            </div>
+            <div class="field">
+              <label for="lDescription">Description</label>
+              <textarea id="lDescription" maxlength="400" placeholder="Colour, brand, stickers, what was inside… (only you and security can see this)"></textarea>
+            </div>
+            <div class="form-foot">
+              <button type="submit" class="btn btn-primary" id="lostSubmit">Save lost report</button>
+              <span class="form-msg" id="lostMsg"></span>
+            </div>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ===== My stuff (lost reports + claims) ===== -->
+    <section class="page hidden" id="page-mine">
+      <div class="container page-pad narrow">
+        <h1>My stuff</h1>
+        <div class="section-head">
+          <h2>My lost reports</h2>
+          <a href="#report-lost" class="btn btn-outline btn-sm">+ Report lost item</a>
+        </div>
+        <div class="list" id="myReportsList"></div>
+
+        <div class="section-head">
+          <h2>My claims</h2>
+        </div>
+        <div class="list" id="myClaimsList"></div>
+      </div>
+    </section>
+
+    <!-- ===== My profile ===== -->
+    <section class="page hidden" id="page-profile">
+      <div class="container page-pad narrow">
+        <h1 id="profileTitle">My profile</h1>
+        <p class="muted" id="profileIntro">Your details are used to fill in your claims automatically. Only you and campus security can see them.</p>
+        <form class="form-card single" id="profileForm" novalidate>
+          <div class="fields">
+            <div class="field">
+              <label for="pName">Full name *</label>
+              <input id="pName" maxlength="80" autocomplete="name" required>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="pMatric">Matric / staff number *</label>
+                <input id="pMatric" maxlength="40" required placeholder="e.g. 190401234">
+              </div>
+              <div class="field">
+                <label for="pLevel">Level *</label>
+                <select id="pLevel" class="select" required>
+                  <option value="">Choose</option>
+                  <option>100 level</option><option>200 level</option><option>300 level</option>
+                  <option>400 level</option><option>500 level</option><option>600 level</option>
+                  <option>Postgraduate</option><option>Staff</option><option>Security</option><option>Other</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="pDept">Department *</label>
+                <input id="pDept" maxlength="80" required placeholder="e.g. Computer Science">
+              </div>
+              <div class="field">
+                <label for="pPhone">Phone number *</label>
+                <input id="pPhone" maxlength="20" type="tel" autocomplete="tel" required placeholder="e.g. 08012345678">
+              </div>
+            </div>
+            <div class="field">
+              <label>Email</label>
+              <input id="pEmail" disabled>
+              <small>This is the email you signed in with.</small>
+            </div>
+            <div class="form-foot">
+              <button class="btn btn-primary" type="submit" id="profileSubmit">Save profile</button>
+              <span class="form-msg" id="profileMsg"></span>
+            </div>
+          </div>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== Footer ===== -->
+  <footer class="footer">
+    <div class="container footer-inner reveal">
+      <div>
+        <a href="#home" class="logo"><span class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg></span><span>Campus<b>Found</b></span></a>
+        <p class="muted small">Helping students get their things back.</p>
+      </div>
+      <div>
+        <h4>Site</h4>
+        <a href="#lost">Found items</a>
+        <a href="#found">Report found</a>
+        <a href="#report-lost">Report lost</a>
+        <a href="#mine">My stuff</a>
+      </div>
+      <div>
+        <h4>Collect items</h4>
+        <p class="small">Bring your student ID and your 6-digit pickup code to the place listed on the item.</p>
+      </div>
+    </div>
+    <div class="container copyright small">© <span id="year"></span> Campus Lost &amp; Found</div>
+  </footer>
+
+  <!-- ===== Item modal ===== -->
+  <div class="modal hidden" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-box" id="modalBox"></div>
+  </div>
+
+  <!-- ===== Sign-in window ===== -->
+  <div class="modal hidden" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="modal-box auth-box">
+      <div class="modal-body">
+        <div class="modal-top">
+          <h2 id="authTitle">Sign in</h2>
+          <button class="close-btn" data-auth-close aria-label="Close">×</button>
+        </div>
+
+        <button class="btn btn-outline google-btn" id="googleBtn" type="button">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Continue with Google
+        </button>
+
+        <div class="divider"><span>or use your email</span></div>
+
+        <div class="tabs auth-tabs" id="authTabs">
+          <button class="tab active" type="button" data-auth-mode="signin">Sign in</button>
+          <button class="tab" type="button" data-auth-mode="signup">Create account</button>
+        </div>
+
+        <form class="fields auth-form" id="authForm" novalidate>
+          <div class="field hidden" id="nameField">
+            <label for="authName">Full name</label>
+            <input id="authName" autocomplete="name" maxlength="60">
+          </div>
+          <div class="field">
+            <label for="authEmail">Email</label>
+            <input id="authEmail" type="email" autocomplete="email" inputmode="email">
+          </div>
+          <div class="field" id="passField">
+            <label for="authPass">Password</label>
+            <input id="authPass" type="password" autocomplete="current-password">
+            <small class="hidden" id="passHint">At least 6 characters.</small>
+          </div>
+          <button class="btn btn-primary" type="submit" id="authSubmit">Sign in</button>
+          <div class="auth-links">
+            <button type="button" class="link-btn" id="forgotBtn">Forgot password?</button>
+            <button type="button" class="link-btn hidden" id="backBtn">Back to sign in</button>
+          </div>
+          <p class="auth-msg hidden" id="authMsg" role="status"></p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script type="module" src="app.js"></script>
+  <script>
+    // If app.js doesn't start within a few seconds, explain why on the page instead of failing silently.
+    (function () {
+      var firstError = "";
+      window.addEventListener("error", function (e) { if (!firstError && e.message) firstError = e.message; }, true);
+      function banner(text) {
+        var b = document.getElementById("setupBanner") || document.createElement("div");
+        b.id = "setupBanner"; b.className = "setup-banner"; b.textContent = text;
+        document.body.prepend(b);
+      }
+      if (location.protocol === "file:") {
+        banner("This page was opened by double-clicking, so nothing will work. Open the folder in VS Code and use Live Server (right-click index.html → Open with Live Server).");
+        return;
+      }
+      setTimeout(function () {
+        if (window.__appStarted) return;
+        var files = ["firebase-config.js", "settings.js", "core.js", "app.js"];
+        Promise.all(files.map(function (f) {
+          return fetch(f, { cache: "no-store" }).then(function (r) { return r.ok ? null : f; }).catch(function () { return f; });
+        })).then(function (missing) {
+          missing = missing.filter(Boolean);
+          if (missing.length) {
+            banner("The app can't start because this folder is missing: " + missing.join(", ") + ". Put it in the same folder as index.html, then refresh.");
+          } else {
+            banner("The app didn't start" + (firstError ? " (" + firstError + ")" : "") + ". Press F12, open the Console tab, and send a screenshot of the red error.");
+          }
+        });
+      }, 4000);
+    })();
+  </script>
+</body>
+</html>

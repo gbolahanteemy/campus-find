@@ -1,0 +1,24 @@
+# ---- Secrets: never upload these ----
+*serviceAccount*.json
+*-firebase-adminsdk-*.json
+.env
+.env.*
+
+# ---- Student data exported from the admin page ----
+students-*.csv
+*.csv
+
+# ---- Firebase tools (created by "firebase deploy") ----
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+
+# ---- Node / editor / computer clutter ----
+node_modules/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
