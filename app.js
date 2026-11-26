@@ -191,31 +191,45 @@ onAuthStateChanged(auth, async (user) => {
 // ---------- Student profiles (users/{uid}) ----------
 async function loadProfile(user) {
   const ref = doc(db, "users", user.uid);
-  try {
-    const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      // First sign-in: save the basics we already know
-      await setDoc(ref, {
-        uid: user.uid,
-        email: user.email || "",
-        name: user.displayName || "",
-        provider: user.providerData[0]?.providerId === "password" ? "email" : "google",
-        createdAt: serverTimestamp(),
-        lastLoginAt: serverTimestamp(),
-      });
-    } else {
-      updateDoc(ref, { lastLoginAt: serverTimestamp() }).catch(() => {});
-    }
-    unsubs.push(onSnapshot(ref, (s) => {
-      state.profile = s.exists() ? s.data() : null;
+  let first = true;
+  // Wait for the first answer from the database (max 8 seconds), but never wait for
+  // writes to be confirmed by the server, so slow connections don't freeze the site.
+  await new Promise((resolve) => {
+    const timer = setTimeout(resolve, 8000);
+    unsubs.push(onSnapshot(ref, (snap) => {
+      if (first) {
+        // A "not found" answer from the phone's memory isn't trustworthy; wait for the server
+        if (!snap.exists() && snap.metadata?.fromCache) return;
+        first = false;
+        clearTimeout(timer);
+        if (!snap.exists()) {
+          // First sign-in: save the basics we already know (sent in the background)
+          const basics = {
+            uid: user.uid,
+            email: user.email || "",
+            name: user.displayName || "",
+            provider: user.providerData[0]?.providerId === "password" ? "email" : "google",
+          };
+          state.profile = basics;
+          setDoc(ref, { ...basics, createdAt: serverTimestamp(), lastLoginAt: serverTimestamp() }, { merge: true })
+            .catch((err) => { console.error("profile", err); toast(friendlyError(err)); });
+        } else {
+          state.profile = snap.data();
+          updateDoc(ref, { lastLoginAt: serverTimestamp() }).catch(() => {});
+        }
+        resolve();
+      } else {
+        state.profile = snap.exists() ? snap.data() : null;
+      }
       if (state.user) $("userName").textContent = (state.profile?.name || state.user.displayName || state.user.email || "Account").split(/[ @]/)[0];
       render();
-    }, (err) => console.error("profile", err)));
-    state.profile = (await getDoc(ref)).data() || null;
-  } catch (err) {
-    console.error("profile", err);
-    toast(friendlyError(err));
-  }
+    }, (err) => {
+      console.error("profile", err);
+      toast(friendlyError(err));
+      clearTimeout(timer);
+      resolve();
+    }));
+  });
   state.profileLoaded = true;
 }
 
@@ -244,25 +258,30 @@ $("profileForm").addEventListener("submit", async (e) => {
     return;
   }
   if (v("pPhone").replace(/\D/g, "").length < 10) { msg.textContent = "Please enter a valid phone number."; return; }
-  const btn = $("profileSubmit");
-  btn.disabled = true;
-  msg.textContent = "Saving…";
-  try {
-    await withTimeout(updateDoc(doc(db, "users", state.user.uid), {
-      name: v("pName"), matric: v("pMatric"), level: v("pLevel"),
-      department: v("pDept"), phone: v("pPhone"), updatedAt: serverTimestamp(),
-    }));
-    state.profile = { ...(state.profile || {}), name: v("pName"), matric: v("pMatric"), level: v("pLevel"), department: v("pDept"), phone: v("pPhone") };
-    msg.textContent = "";
-    toast("Profile saved.");
-    const next = state.afterProfile;
-    state.afterProfile = null;
-    if (next && next !== "#profile") { location.hash = next.slice(1) || "home"; showPage(); }
-  } catch (err) {
-    msg.textContent = friendlyError(err);
-  } finally {
-    btn.disabled = false;
-  }
+  const uid = state.user.uid;
+  const fields = { name: v("pName"), matric: v("pMatric"), level: v("pLevel"), department: v("pDept"), phone: v("pPhone") };
+
+  // Save in the background: Firebase keeps the change on this device straight away and
+  // finishes sending it to the server on its own, so the student doesn't have to wait.
+  // (merge: creates the profile if it was never made, otherwise just updates these fields)
+  setDoc(doc(db, "users", uid), {
+    uid,
+    email: state.profile?.email ?? state.user.email ?? "",
+    ...fields,
+    updatedAt: serverTimestamp(),
+  }, { merge: true }).catch((err) => {
+    // Only reached if the server refuses the save (e.g. rules not published)
+    toast("Your profile couldn't be saved. " + friendlyError(err));
+    if (state.user?.uid === uid) { location.hash = "profile"; showPage(); }
+  });
+
+  state.profile = { ...(state.profile || {}), ...fields };
+  msg.textContent = "";
+  toast("Profile saved.");
+  const next = state.afterProfile;
+  state.afterProfile = null;
+  if (next && next !== "#profile") { location.hash = next.slice(1) || "home"; showPage(); }
+  else fillProfileForm();
 });
 
 // ---------- Items (signed-in only) ----------
