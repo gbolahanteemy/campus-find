@@ -401,25 +401,46 @@ function renderHome() {
       : `<p class="muted small">No items yet. Found something? <a href="#found"><b>Report it</b></a>.</p>`;
 }
 
+// Search: every word must appear somewhere; ignores capitals, spaces and dashes,
+// so "power bank" finds "Powerbank", "Power-bank" and "power bank".
+const squash = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+const normPlace = (p) => String(p || "").toLowerCase().replace(/\s+/g, " ").trim();
+function matchesSearch(it, q) {
+  if (!q) return true;
+  const text = [it.title, it.location, it.description, it.keptAt, it.category].join(" ").toLowerCase();
+  const flat = squash(text);
+  if (flat.includes(squash(q))) return true;
+  return q.split(/\s+/).filter(Boolean).every((w) => text.includes(w) || flat.includes(squash(w)));
+}
+
 function renderGrid() {
   // location dropdown: settings + any custom places used in items
-  const used = [...new Set(state.items.map((i) => i.location).filter(Boolean))];
-  const places = [...new Set([...SETTINGS.locations, ...used])].sort();
+  // One entry per place, ignoring capitals and extra spaces ("admin block" = "Admin Block")
+  const placeMap = new Map();
+  [...SETTINGS.locations, ...state.items.map((i) => i.location)].filter(Boolean).forEach((p) => {
+    const k = normPlace(p);
+    if (!placeMap.has(k)) placeMap.set(k, p.trim());
+  });
+  const places = [...placeMap.values()].sort((a, b) => a.localeCompare(b));
   $("locationFilter").innerHTML = `<option value="">All locations</option>` + optionList(places, state.location);
 
   if (!state.itemsLoaded) { $("itemGrid").innerHTML = `<div class="empty">Loading items…</div>`; return; }
-  const q = state.search;
   const list = state.items.filter((it) => {
     if (state.filter === "open" && !OPEN_STATUSES.includes(it.status)) return false;
     if (state.filter === "returned" && it.status !== "returned") return false;
     if (state.category !== "All" && it.category !== state.category) return false;
-    if (state.location && it.location !== state.location) return false;
-    return !q || [it.title, it.location, it.description, it.keptAt, it.category].join(" ").toLowerCase().includes(q);
+    if (state.location && normPlace(it.location) !== normPlace(state.location)) return false;
+    return matchesSearch(it, state.search);
   });
   if (!list.length) {
+    const filtersOn = state.search || state.location || state.category !== "All" || state.filter !== "all";
+    const hidden = state.items.length;
     $("itemGrid").innerHTML = `<div class="empty">${
-      state.items.length ? "No items match. Try another category, place or word."
-        : "No items have been reported yet."}<br><a class="btn btn-primary" href="#found">Report a found item</a></div>`;
+      !hidden ? "No items have been reported yet."
+        : filtersOn ? "No items match your search and filters."
+        : "No items match."}<br>
+      ${hidden && filtersOn ? `<button class="btn btn-outline" data-clear-filters>Clear search &amp; filters</button>` : ""}
+      <a class="btn btn-primary" href="#found">Report a found item</a></div>`;
     return;
   }
   $("itemGrid").innerHTML = list.map((it, i) => `
@@ -434,6 +455,14 @@ function renderGrid() {
 }
 
 $("search").addEventListener("input", (e) => { state.search = e.target.value.trim().toLowerCase(); renderGrid(); });
+$("itemGrid").addEventListener("click", (e) => {
+  if (!e.target.closest("[data-clear-filters]")) return;
+  state.search = ""; state.location = ""; state.category = "All"; state.filter = "all";
+  $("search").value = "";
+  document.querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c.dataset.cat === "All"));
+  document.querySelectorAll("#filterTabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.filter === "all"));
+  renderGrid();
+});
 $("locationFilter").addEventListener("change", (e) => { state.location = e.target.value; renderGrid(); });
 $("categoryChips").addEventListener("click", (e) => {
   const chip = e.target.closest(".chip");
