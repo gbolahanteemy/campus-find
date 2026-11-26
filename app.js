@@ -10,7 +10,7 @@ import {
   onSnapshot, query, orderBy, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  $, BOX_ICON, CLAIM_STATUS, DAY, OPEN_STATUSES, PIN_ICON, SETTINGS, STATUS, WA_ICON, allowed, app, auth, authMessage, closeAuth, compressImage, daysSince, db, emailAllowed, esc, firebaseConfig, formatDate, friendlyError, googleSignIn, isDataImage, isLongUnclaimed, itemLink, millis, needsVerification, optionList, revealScan, setAuthMode, setupBanner, signIn, sixDigitCode, thumb, tinyPreview, toast, waSecurityLink, waShareLink, withTimeout, trackSave
+  $, BOX_ICON, CLAIM_STATUS, DAY, OPEN_STATUSES, PIN_ICON, SETTINGS, STATUS, WA_ICON, allowed, app, auth, authMessage, closeAuth, compressImage, daysSince, db, emailAllowed, esc, firebaseConfig, formatDate, friendlyError, googleSignIn, isDataImage, isLongUnclaimed, itemLink, millis, needsVerification, optionList, revealScan, setAuthMode, setupBanner, signIn, sixDigitCode, thumb, tinyPreview, toast, waSecurityLink, waShareLink, withTimeout, trackSave, checkServer
 } from "./core.js";
 
 // Catch the "replaced some files but not index.html" mistake
@@ -89,7 +89,10 @@ function showPage() {
   let gated = false;
   if (NEEDS_SIGN_IN.includes(page) && !state.user) {
     gated = true;
-    $("gateText").textContent = openId
+    const checking = !state.authReady;
+    $("page-gate").querySelector("h1").textContent = checking ? "Checking your sign-in…" : "Sign in to continue";
+    $("page-gate").querySelectorAll("[data-signin]").forEach((b) => b.classList.toggle("hidden", checking));
+    $("gateText").textContent = checking ? "One moment." : openId
       ? "Someone shared a found item with you. Sign in to see it and claim it if it's yours."
       : "Campus Lost & Found is for students and staff. Sign in to see found items, report something you lost or found, and check your claims.";
     page = "gate";
@@ -170,23 +173,31 @@ onAuthStateChanged(auth, async (user) => {
     $("userName").title = "Your user ID: " + user.uid;
     $("userPhoto").src = user.photoURL || "";
     $("userPhoto").classList.toggle("hidden", !user.photoURL);
+  }
 
-    try { state.isAdmin = (await getDoc(doc(db, "admins", user.uid))).exists(); } catch { state.isAdmin = false; }
-    await loadProfile(user);
+  // Show the signed-in page straight away; database checks below finish in the background
+  state.authReady = true;
+  showPage();
+
+  if (user) {
+    const uid = user.uid;
+    getDoc(doc(db, "admins", uid))
+      .then((snap) => { if (state.user?.uid === uid) { state.isAdmin = snap.exists(); render(); } })
+      .catch(() => {});
 
     const listen = (q, key) => unsubs.push(onSnapshot(q,
       (snap) => { state[key] = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); },
       (err) => console.error(key, err)));
+    listen(query(collection(db, "claims"), where("claimantUid", "==", uid)), "myClaims");
+    listen(query(collection(db, "lostReports"), where("uid", "==", uid)), "myReports");
 
-    listen(query(collection(db, "claims"), where("claimantUid", "==", user.uid)), "myClaims");
-    listen(query(collection(db, "lostReports"), where("uid", "==", user.uid)), "myReports");
+    // Once the profile has loaded, send new students to "Complete your profile" if needed
+    loadProfile(user).then(() => {
+      if (state.user?.uid !== uid) return;
+      if (!profileComplete(state.profile)) showPage(); else render();
+    });
   }
-
-  state.authReady = true;
-  showPage();
 });
-
-
 
 // ---------- Student profiles (users/{uid}) ----------
 async function loadProfile(user) {
@@ -287,6 +298,13 @@ $("profileForm").addEventListener("submit", async (e) => {
 // ---------- Items (signed-in only) ----------
 let unsubItems = null;
 function startItems() {
+  // If the list hasn't loaded after 10 seconds, find out why
+  setTimeout(async () => {
+    if (state.user && !state.itemsLoaded) {
+      const result = await checkServer();
+      if (!result.ok) { setupBanner(result.text); $("itemGrid").innerHTML = `<div class="empty">${esc(result.text)}</div>`; }
+    }
+  }, 10000);
   unsubItems = onSnapshot(
     query(collection(db, "items"), orderBy("createdAt", "desc")),
     (snap) => {
